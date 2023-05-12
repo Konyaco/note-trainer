@@ -1,5 +1,5 @@
 <script>
-import {defineComponent, transformVNodeArgs} from 'vue'
+import {defineComponent} from 'vue'
 
 const naturalNotes = [
     {name: "C", equalIndex: 0, naturalIndex: 0},
@@ -86,6 +86,7 @@ export default defineComponent({
                 lowest: "A3",
                 highest: "B5",
                 count: 24,
+                type: 0
             },
             answer: {
                 startTime: null,
@@ -102,7 +103,11 @@ export default defineComponent({
             },
             keyboard: {
                 keys: []
-            }
+            },
+            clefOptions: [
+                {label: "High", value: 0},
+                {label: "Base", value: 1}
+            ]
         }
     },
     computed: {
@@ -161,8 +166,15 @@ export default defineComponent({
             let lineThickness = 1
             let pxPerIndex = (lineHeight / 2)
 
-            let topPitch = noteToNaturalIndex("f5")
-            let bottomPitch = noteToNaturalIndex("e4")
+            let topPitch = 0
+            let bottomPitch = 0
+            if (this.trainingOptions.type === 0) {
+                topPitch = noteToNaturalIndex("F5")
+                bottomPitch = noteToNaturalIndex("E4")
+            } else {
+                topPitch = noteToNaturalIndex("A3")
+                bottomPitch = noteToNaturalIndex("G2")
+            }
 
             context.fillRect(0, paddingTop, 1, lineHeight * 4)
             for (let i = 0; i < 5; i++) {
@@ -170,8 +182,14 @@ export default defineComponent({
             }
             context.fillRect(canvas.width - 1, paddingTop, 1, lineHeight * 4)
 
-            let puhaoY = (topPitch - noteToNaturalIndex("g4")) * pxPerIndex
-            context.fillText("\uE050", 6, paddingTop + puhaoY)
+            if (this.trainingOptions.type === 0) {
+                let clefY = (topPitch - noteToNaturalIndex("G4")) * pxPerIndex
+                context.fillText("\uE050", 6, paddingTop + clefY)
+            } else {
+                let clefY = (topPitch - noteToNaturalIndex("F3")) * pxPerIndex
+                context.fillText("\uE062", 6, paddingTop + clefY)
+            }
+
 
             let offsetX = 40;
             for (let i = 0; i < this.notes.length; i++) {
@@ -239,7 +257,7 @@ export default defineComponent({
         },
         generateKeyboard() {
             let keys = []
-            for (let i = 3; i < 6; i++) {
+            for (let i = 1; i <= 7; i++) {
                 naturalNotes.forEach(item => {
                     keys.push({
                         name: item.name,
@@ -253,13 +271,13 @@ export default defineComponent({
         },
         onKeyEnter(key) {
             let map = {
-                "q": "C3",
-                "w": "D3",
-                "e": "E3",
-                "r": "F3",
-                "t": "G3",
-                "y": "A3",
-                "u": "B3",
+                "z": "C3",
+                "x": "D3",
+                "c": "E3",
+                "v": "F3",
+                "b": "G3",
+                "n": "A3",
+                "m": "B3",
                 "a": "C4",
                 "s": "D4",
                 "d": "E4",
@@ -267,13 +285,13 @@ export default defineComponent({
                 "g": "G4",
                 "h": "A4",
                 "j": "B4",
-                "z": "C5",
-                "x": "D5",
-                "c": "E5",
-                "v": "F5",
-                "b": "G5",
-                "n": "A5",
-                "m": "B5",
+                "q": "C5",
+                "w": "D5",
+                "e": "E5",
+                "r": "F5",
+                "t": "G5",
+                "y": "A5",
+                "u": "B5",
             }
             let noteNameWithRegistry = map[key]
             this.keyboardClick({
@@ -300,6 +318,16 @@ export default defineComponent({
             this.answer.cursor += 1
 
             // this.notes.push({name: note, duration: "8"})
+        },
+        selectClef(value) {
+            if (value === 0) {
+                this.trainingOptions.lowest = "A3"
+                this.trainingOptions.highest = "B5"
+            } else {
+                this.trainingOptions.lowest = "C2"
+                this.trainingOptions.highest = "D4"
+            }
+            this.trainingOptions.type = value
         }
     }
 })
@@ -308,29 +336,46 @@ export default defineComponent({
 <template>
     <div class="container">
         <div class="controller">
+
             <n-button @click="randomNotation" type="primary">
                 Start
             </n-button>
-            <n-input style="width: fit-content" type="text" v-model:value="trainingOptions.lowest"
-                     placeholder="Lowest"></n-input>
+            <n-form-item label="Lowest" label-placement="left">
+                <n-input style="width: fit-content" type="text" v-model:value="trainingOptions.lowest"
+                         placeholder="Lowest"></n-input>
+            </n-form-item>
             ~
-            <n-input style="width: fit-content" type="text" v-model:value="trainingOptions.highest"
-                     placeholder="Highest"></n-input>
-            <n-input style="width: fit-content" type="text" v-model:value="trainingOptions.count"
-                     placeholder="Count"></n-input>
+            <n-form-item label="Highest" label-placement="left">
+                <n-input style="width: fit-content" type="text" v-model:value="trainingOptions.highest"
+                         placeholder="Highest"></n-input>
+            </n-form-item>
+            <n-form-item label="Count" label-placement="left">
+                <n-input style="width: 80px" type="text" v-model:value="trainingOptions.count"
+                         placeholder="Count"></n-input>
+            </n-form-item>
+            <n-form-item label="Clef" label-placement="left">
+                <n-select style="width: 120px" @update:value="selectClef" :value="trainingOptions.type" :options="clefOptions">
+                </n-select>
+            </n-form-item>
         </div>
         <div ref="canvasContainer" class="canvas-container">
             <canvas ref="canvas" class="canvas">
             </canvas>
         </div>
         <div class="status">
-            Total spend: {{status.totalSpend}}ms
-            Last spend: {{status.lastSpend}}ms
+            Total spend: {{ status.totalSpend }}ms
+            Last spend: {{ status.lastSpend }}ms
         </div>
-        <div class="keyboard">
-            <div :class="{ 'item': true, 'c': item.relativeNaturalIndex === 0, 'middle-c': item.nameWithRegistry === 'C4' }"
-                 v-for="item in keyboard.keys" @click="keyboardClick(item)">{{ item.name === 'C' ? item.nameWithRegistry : item.name }}
-            </div>
+        <div class="footer">
+            <n-scrollbar x-scrollable>
+                <div class="keyboard">
+                    <div :class="{ 'item': true, 'c': item.relativeNaturalIndex === 0, 'middle-c': item.nameWithRegistry === 'C4' }"
+                         v-for="item in keyboard.keys" @click="keyboardClick(item)">
+                        {{ item.name === 'C' ? item.nameWithRegistry : item.name }}
+                    </div>
+
+                </div>
+            </n-scrollbar>
         </div>
     </div>
 </template>
@@ -355,11 +400,17 @@ export default defineComponent({
     flex-grow: 1;
     display: flex;
     padding: 0;
+    min-height: 300px;
 }
 
 .canvas {
     position: absolute;
     font: normal 30px "Leland", sans-serif;
+}
+
+.footer {
+    display: flex;
+    //height: 300px;
 }
 
 .keyboard {
